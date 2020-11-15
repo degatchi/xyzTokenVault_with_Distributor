@@ -6,6 +6,7 @@ Functionality as of 15/11/2020 include:
 - swapping eth-xyz & xyz-eth (100 xyz for 1 eth)
 - deposit/withdraw eth feature
 - freeze/unfreeze contract
+- approve (allow someone to spend tokens)
 - transfer
 - transferFrom
 - transferOwnership
