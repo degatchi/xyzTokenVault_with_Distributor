@@ -15,19 +15,19 @@ contract XYZToken is ownerOnly, FreezeFunction, Vault {
     string  symbol = "XYZ";
     uint256 public totalSupply = 10000000000000000000000; // 10k tokens
     uint8 decimals = 18;
+    uint256 public conversionRate = 100;
     
     // balanceOf displays balanceOf XYZ Token for an address
     mapping(address => uint256) public balanceOf;
     // how mcuh an address is allowed to spend 
     mapping(address => mapping(address => uint256)) internal allowance;
-    // [Staking] * work in progress
-    // mapping(address => uint256) public stakeBalance;
 
     // Broadcasted Events
     event returnTokens(address indexed _address, uint _amount);
     event TokensMinted(uint indexed _mintedTokens);
     event TokensBurned(uint indexed _burnedSupply);
     event Deposit(address indexed dst, uint val);
+    event Withdrawal(address indexed address, uint eth);
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
     event Swap(address indexed _user, string inputCurrency, uint input, string outputCurrency, uint output);
@@ -82,7 +82,7 @@ contract XYZToken is ownerOnly, FreezeFunction, Vault {
     }
 
     // Creates more totalSupply of the token
-    function mintTokens( uint tokens) external onlyOwner freezeFunction returns (bool success) {
+    function mintTokens(uint tokens) external onlyOwner freezeFunction returns (bool success) {
         require(msg.sender == owner, "Not owner");
 
         balanceOf[msg.sender] = balanceOf[msg.sender].add(tokens);
@@ -92,103 +92,38 @@ contract XYZToken is ownerOnly, FreezeFunction, Vault {
         emit TokensMinted(tokens);
         return true;
     }
-// --------------------------------[Swap Functions]------------------------------------
-    
-    // User swaps 1 eth for 100 xyzToken
-    function swapToXYZ(uint _ethAmount) external freezeFunction returns (bool success) {
-        require(vaultBalance[msg.sender] != 0, "Insufficient eth available");
-        require(vaultBalance[msg.sender] >= _ethAmount, "Insufficient funds available");
-        
-        vaultBalance[msg.sender] = vaultBalance[msg.sender].sub(_ethAmount);
-        balanceOf[msg.sender] = balanceOf[msg.sender].add(_ethAmount.mul(100));
+//-----------------------------[Conversion Rate Adjustment]----------------------------
 
-        emit Swap(msg.sender, "ETH", _ethAmount, "XYZ", _ethAmount*100);
-        return success;
+    function setConversion(uint _conversionRate) public onlyOwner freezeFunction returns (bool success) {
+        conversionRate = _conversionRate;
+        return true;
     }
 
-    // User swaps 100 xyzToken for 1 eth
-    function swapToETH(uint _xyzAmount) external freezeFunction returns (bool success) {
-        require(balanceOf[msg.sender] != 0, "Insufficient xyz available");
-        require(balanceOf[msg.sender] >= _xyzAmount, "Insufficient funds available");
+// -------------------------------[Deposit & Withdraw]----------------------------------
+    // User deposits eth -> vaultBalance -> vaultBalance bal updates
+    function depositETHforXYZ(uint _ethAmount) public payable freezeFunction returns(bool success) {
+        require(_ethAmount > 0 ether, "Cannot be 0");
 
+        // address(vaultBalance[msg.sender]).transfer(_ethAmount);
+        balanceOf[msg.sender] = balanceOf[msg.sender].add(_ethAmount.mul(conversionRate));
+
+        emit Swap(msg.sender, "ETH", _ethAmount, "XYZ", _ethAmount.mul(conversionRate));
+        emit Deposit(msg.sender, _ethAmount);
+            return true;
+    }
+
+        // Allows user to withdraw a desired amount of eth from their vault address.
+    function withdrawXYZforETH(uint _xyzAmount) public freezeFunction returns(bool success) {
+        require(balanceOf[msg.sender] != 0, "No funds to withdraw");
+        require(isStaking[msg.sender] != true, "Cannot withdraw eth while staking");
+        require(balanceOf[msg.sender] >= _xyzAmount, "Not enough funds to withdraw");
+        
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_xyzAmount);
-        vaultBalance[msg.sender] = vaultBalance[msg.sender].add(_xyzAmount.div(100));
-
-        emit Swap(msg.sender, "XYZ", _xyzAmount, "ETH", _xyzAmount/100);
-        return success;
-    } 
-// -------------------------------------------------------------------------------------
-
-//                             @notice work in progress staking system
-//                            was originally the swapping functionality
-
-// // ----------------------------------------[Staking]------------------------------------------------
-// //                               *[Need to add staking rewards]*
-
-//     // Stakes tokens from vault deposit
-//     // Sets isStaking to: true
-//     // Removes amount from vaultBalance to stakeBalance
-//     // calls receiveXYZ function
-//     function stake(uint _stakeAmount) external freezeFunction returns (bool success) {
-//         require(_stakeAmount != 0, "Cannot stake 0 eth");
-//         require(vaultBalance[msg.sender] != 0, "You have no eth deposited to stake");
-//         require(isStaking[msg.sender] != true, "You are already staking");
+        msg.sender.transfer((_xyzAmount.div(conversionRate)).mul(1000000000000000000));
         
-//         isStaking[msg.sender] = true;
-//         vaultBalance[msg.sender] -= _stakeAmount;
-//         balanceOf[msg.sender] += _stakeAmount;
         
-//         emit Staking(msg.sender, true);
-//         receiveXYZ();
-//         return true;
-//     }
-    
-//     // Issues tokens equal to the amount of eth deposited
-//     function receiveXYZ() internal freezeFunction returns(bool success) {
-//         require(balanceOf[msg.sender] != 0, "You have no eth staked");
-//         require(hasDepositedEther[msg.sender] = true, "You have no deposited any ether");
-//         require(isStaking[msg.sender] = true, "You must stake to receive XYZ Tokens");
-        
-//         uint stakeBal = balanceOf[msg.sender];
-//         balanceOf[msg.sender] = 0;
-//         stakeBalance[msg.sender] = stakeBal.mul(100);
-        
-//         emit Deposit(msg.sender, stakeBal);
-//         emit Staking(msg.sender, true);
-//         return true;
-//     }
-
-//     function unstake(uint _unstakeAmount) external freezeFunction returns (bool success) {
-//         require(_unstakeAmount != 0, "Cannot unstake 0 eth");
-//         require(stakeBalance[msg.sender] != 0, "You have no funds staked");
-//         require(isStaking[msg.sender] == true, "You are already staking");
-        
-//         isStaking[msg.sender] = false;
-//         stakeBalance[msg.sender] -= _unstakeAmount;
-//         balanceOf[msg.sender] += _unstakeAmount;
-        
-//         emit Staking(msg.sender, false);
-//         returnXYZ();
-//         return true;
-//     }
-    
-//     // Checks if staking: true & stakeBalance: != 0
-//     // Switches staking to off, makes stakeBalance: 0, transfers previous stakeBalance to vaultBalance
-//     function returnXYZ() internal freezeFunction returns(bool success) {
-//         require(isStaking[msg.sender] = true, "You are not staking");
-//         require(balanceOf[msg.sender] != 0, "You have no XYZ Tokens to return");
-        
-//         isStaking[msg.sender] = false;
-//         uint stakeBal = balanceOf[msg.sender];
-//         balanceOf[msg.sender] = 0;
-//         vaultBalance[msg.sender] = stakeBal.div(100);
-        
-//         emit returnTokens(msg.sender, stakeBal);
-//         emit Staking(msg.sender, false);
-//         return true;
-//     }
-
-// ---------------------------------------------------------------------------------------------
+        emit Swap(msg.sender, "XYZ", _xyzAmount, "ETH", _xyzAmount.div(conversionRate));
+        emit Withdrawal(msg.sender, _xyzAmount.div(conversionRate));
+        return true;
+    }
 }
-
-
