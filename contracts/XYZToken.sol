@@ -2,11 +2,9 @@ pragma solidity 0.6.6;
 
 // All external smart contracts in use
 import "./SafeMath.sol";
-import "./ownerOnly.sol";
-import "./Vault.sol";
-import "./FreezeFunction.sol";
+import "./onlyOwner.sol";
 
-contract XYZToken is ownerOnly, FreezeFunction, Vault {
+contract XYZToken is onlyOwner {
     // Using SafeMath to prevent underflow and overflow 
     using SafeMath for uint;
 
@@ -21,13 +19,14 @@ contract XYZToken is ownerOnly, FreezeFunction, Vault {
     mapping(address => uint256) public balanceOf;
     // how mcuh an address is allowed to spend 
     mapping(address => mapping(address => uint256)) internal allowance;
+    mapping(address => uint256) internal vaultBalance;
 
     // Broadcasted Events
     event returnTokens(address indexed _address, uint _amount);
     event TokensMinted(uint indexed _mintedTokens);
     event TokensBurned(uint indexed _burnedSupply);
     event Deposit(address indexed dst, uint val);
-    event Withdrawal(address indexed address, uint eth);
+    event Withdrawal(address indexed src, uint _xyzAmount);
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
     event Swap(address indexed _user, string inputCurrency, uint input, string outputCurrency, uint output);
@@ -103,19 +102,19 @@ contract XYZToken is ownerOnly, FreezeFunction, Vault {
     // User deposits eth -> vaultBalance -> vaultBalance bal updates
     function depositETHforXYZ(uint _ethAmount) public payable freezeFunction returns(bool success) {
         require(_ethAmount > 0 ether, "Cannot be 0");
-
+ 
         // address(vaultBalance[msg.sender]).transfer(_ethAmount);
         balanceOf[msg.sender] = balanceOf[msg.sender].add(_ethAmount.mul(conversionRate));
 
         emit Swap(msg.sender, "ETH", _ethAmount, "XYZ", _ethAmount.mul(conversionRate));
         emit Deposit(msg.sender, _ethAmount);
-            return true;
+
+        return true;
     }
 
         // Allows user to withdraw a desired amount of eth from their vault address.
     function withdrawXYZforETH(uint _xyzAmount) public freezeFunction returns(bool success) {
         require(balanceOf[msg.sender] != 0, "No funds to withdraw");
-        require(isStaking[msg.sender] != true, "Cannot withdraw eth while staking");
         require(balanceOf[msg.sender] >= _xyzAmount, "Not enough funds to withdraw");
         
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_xyzAmount);
