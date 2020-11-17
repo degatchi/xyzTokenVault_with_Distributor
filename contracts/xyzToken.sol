@@ -11,7 +11,7 @@ contract xyzToken is Permissions {
     // Variables
     string  name = "XYZ Token";
     string  symbol = "XYZ";
-    uint256 public totalSupply = 10000000000000000000000; // 10k tokens
+    uint256 public totalSupply; // dynamic supply
     uint8 decimals = 18;
     uint256 public conversionRate = 100;
     
@@ -46,14 +46,13 @@ contract xyzToken is Permissions {
         emit Transfer(msg.sender, _to, _value);
         return true;
     }
-
+    
     // Approve tokens (allow someone to spend tokens)
     function approve(address _spender, uint256 _value) public freezeFunction returns (bool success) {
         allowance[msg.sender][_spender] = _value;
         emit Approval(msg.sender, _spender, _value);
         return true;
     }
-
 
     // Transfer from (allow transfer instead of us)
     function transferFrom(address _from, address _to, uint256 _value) public freezeFunction returns (bool success) {
@@ -99,30 +98,33 @@ contract xyzToken is Permissions {
     }
 
 // -------------------------------[Deposit & Withdraw]----------------------------------
-    // User deposits eth -> vaultBalance -> vaultBalance bal updates
-    function depositETHforXYZ(uint _ethAmount) public payable freezeFunction returns(bool success) {
-        require(_ethAmount > 0 ether, "Cannot be 0");
+    function depositETHforXYZ() public payable freezeFunction returns(bool success) {
+        require(msg.value > 0 wei, "Cannot be 0");
+        require(msg.sender.balance > 0 wei, "Not enough funds");
  
-        // address(vaultBalance[msg.sender]).transfer(_ethAmount);
-        balanceOf[msg.sender] = balanceOf[msg.sender].add(_ethAmount.mul(conversionRate));
+        totalSupply = totalSupply.add((msg.value.mul(conversionRate)).div(1000000000000000000));
+        balanceOf[msg.sender] = balanceOf[msg.sender].add((msg.value.mul(conversionRate)).div(1000000000000000000));
 
-        emit Swap(msg.sender, "ETH", _ethAmount, "XYZ", _ethAmount.mul(conversionRate));
-        emit Deposit(msg.sender, _ethAmount);
+        emit Swap(msg.sender, "ETH", msg.value, "XYZ", msg.value.mul(conversionRate));
+        emit TokensMinted(msg.value.mul(conversionRate));
+        emit Deposit(msg.sender, msg.value);
 
         return true;
     }
 
-        // Allows user to withdraw a desired amount of eth from their vault address.
     function withdrawXYZforETH(uint _xyzAmount) public freezeFunction returns(bool success) {
         require(balanceOf[msg.sender] != 0, "No funds to withdraw");
         require(balanceOf[msg.sender] >= _xyzAmount, "Not enough funds to withdraw");
         
+        totalSupply = totalSupply.sub(_xyzAmount);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_xyzAmount);
-        msg.sender.transfer((_xyzAmount.div(conversionRate)).mul(1000000000000000000));
-        
+        _xyzAmount = _xyzAmount.mul(1000000000000000000);
+        msg.sender.transfer(_xyzAmount.div(conversionRate));
         
         emit Swap(msg.sender, "XYZ", _xyzAmount, "ETH", _xyzAmount.div(conversionRate));
-        emit Withdrawal(msg.sender, _xyzAmount.div(conversionRate));
+        emit TokensBurned(_xyzAmount);
+        emit Withdrawal(msg.sender, (_xyzAmount.div(conversionRate)));
+        
         return true;
     }
 }
