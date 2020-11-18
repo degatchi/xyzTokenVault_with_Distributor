@@ -41,12 +41,13 @@ contract Permissions {
 
     // Owner freezes the contract - DISABLING functionality
     function freezeContract() public onlyOwner {
+        require(isFrozen != true, "already frozen");
         isFrozen = true;
     }
 
     // Owner unfreezes the contract - ENABLING functionality
     function unfreezeContract() public onlyOwner {
+        require(isFrozen != false, "already unfrozen");
         isFrozen = false;
     }
-
 }
