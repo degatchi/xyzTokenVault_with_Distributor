@@ -17,9 +17,9 @@ contract xyzToken is Permissions {
     
     // balanceOf displays balanceOf XYZ Token for an address
     mapping(address => uint256) public balanceOf;
-    // how mcuh an address is allowed to spend 
-    mapping(address => mapping(address => uint256)) internal allowance;
     mapping(address => uint256) internal vaultBalance;
+    // Mapping owner address to those who are allowed to use the contract 
+    mapping(address => mapping (address => uint256)) allowed; 
 
     // Broadcasted Events
     event returnTokens(address indexed _address, uint _amount);
@@ -29,51 +29,61 @@ contract xyzToken is Permissions {
     event Withdrawal(address indexed src, uint _xyzAmount);
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
+    event deductionOfFundsAllowed(address indexed _address, uint removed);
+    event allowanceChange(address indexed _owner, address indexed _spender, uint256 _value);
     event Swap(address indexed _user, string inputCurrency, uint input, string outputCurrency, uint output);
     
     // Marks that the deployer (msg.sender) controls the supply
     constructor() public {
         balanceOf[msg.sender] = totalSupply;
     }
+    
+// ----------------------------------------[Allowance]---------------------------------------------
 
-    // Transfer tokens to address
-    function transfer(address _to, uint256 _value) public freezeFunction returns (bool success) {
-        require(balanceOf[msg.sender] >= _value);
+    // Check if address is allowed to spend on the owner's behalf 
+    function allowance(address _owner, address _spender) public view returns (uint256 remaining) { 
+        return allowed[_owner][_spender]; 
+    } 
 
-        balanceOf[msg.sender] = balanceOf[msg.sender].sub(_value);
-        balanceOf[_to] = balanceOf[_to].add(_value);
-        
-        emit Transfer(msg.sender, _to, _value);
+    // function approve 
+    function approve(address _spender, uint256 _amount) public returns (bool success) {
+        require(balanceOf[msg.sender] >= 0, "No funds available to use");
+        // If the adress is allowed to spend from this contract 
+        allowed[msg.sender][_spender] = _amount; 
+        emit Approval(msg.sender, _spender, _amount); 
+        return true; 
+    } 
+    
+// ---------------------------------------[Transfer]-----------------------------------------------
+    
+    // allows transfer funds from msg.sender address to input address
+    function transfer(address _to, uint256 _amount) public returns (bool success) {
+        require(balanceOf[msg.sender] != 0, "Not enough funds");
+        balanceOf[msg.sender] -= _amount;
+        balanceOf[_to] += _amount;
+        emit Transfer(msg.sender, _to, _amount);  
         return true;
     }
     
-    // Approve tokens (allow someone to spend tokens)
-    function approve(address _spender, uint256 _value) public freezeFunction returns (bool success) {
-        allowance[msg.sender][_spender] = _value;
-        emit Approval(msg.sender, _spender, _value);
-        return true;
-    }
+    // allows contracts to send tokens on your behalf, 
+    // for example to "deposit" to a contract address and/or to charge fees in sub-currencies
+    function transferFrom(address _from, address _to, uint256 _amount) public returns (bool success) { 
+        require(allowed[_from][msg.sender] >= _amount, "Not allowed from owner"); 
+        allowed[_from][msg.sender] -= _amount;
+        balanceOf[_from] -= _amount; 
+        balanceOf[_to] += _amount; 
+        emit deductionOfFundsAllowed(_from, _amount);
+        emit Transfer(_from, _to, _amount);  
+        return true; 
+    } 
 
-    // Transfer from (allow transfer instead of us)
-    function transferFrom(address _from, address _to, uint256 _value) public freezeFunction returns (bool success) {
-        require(_value <= balanceOf[_from]);
-        require(_value <= allowance[_from][msg.sender]);
-        balanceOf[_from] = balanceOf[_from].sub(_value);
-        balanceOf[_to] = balanceOf[_to].add(_value);
-        allowance[_from][msg.sender] = allowance[_from][msg.sender].sub(_value);
-        emit Transfer(_from, _to, _value);
-        return true;
-    }
-
-// ---------------------------------[Mint + Burn]--------------------------------------
+// -------------------------------------[Mint + Burn]--------------------------------------
 
     // Removes x amount from totalSupply
     function burnTokens(uint tokens) external onlyOwner freezeFunction returns (bool success) {
         require(msg.sender == owner, "Not owner");
-
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(tokens);
         totalSupply = totalSupply.sub(tokens);
-
         emit Transfer(msg.sender, address(0), tokens);
         emit TokensBurned(tokens);
         return true;
@@ -82,14 +92,13 @@ contract xyzToken is Permissions {
     // Creates more totalSupply of the token
     function mintTokens(uint tokens) external onlyOwner freezeFunction returns (bool success) {
         require(msg.sender == owner, "Not owner");
-
         balanceOf[msg.sender] = balanceOf[msg.sender].add(tokens);
         totalSupply = totalSupply.add(tokens);
-
         emit Transfer(msg.sender, address(0), tokens);
         emit TokensMinted(tokens);
         return true;
     }
+    
 //-----------------------------[Conversion Rate Adjustment]----------------------------
 
     function setConversion(uint _conversionRate) public onlyOwner freezeFunction returns (bool success) {
@@ -101,30 +110,24 @@ contract xyzToken is Permissions {
     function depositETHforXYZ() public payable freezeFunction returns(bool success) {
         require(msg.value > 0 wei, "Cannot be 0");
         require(msg.sender.balance > 0 wei, "Not enough funds");
- 
         totalSupply = totalSupply.add((msg.value.mul(conversionRate)).div(1000000000000000000));
         balanceOf[msg.sender] = balanceOf[msg.sender].add((msg.value.mul(conversionRate)).div(1000000000000000000));
-
         emit Swap(msg.sender, "ETH", msg.value, "XYZ", msg.value.mul(conversionRate));
         emit TokensMinted(msg.value.mul(conversionRate));
         emit Deposit(msg.sender, msg.value);
-
         return true;
     }
 
     function withdrawXYZforETH(uint _xyzAmount) public freezeFunction returns(bool success) {
         require(balanceOf[msg.sender] != 0, "No funds to withdraw");
         require(balanceOf[msg.sender] >= _xyzAmount, "Not enough funds to withdraw");
-        
         totalSupply = totalSupply.sub(_xyzAmount);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_xyzAmount);
         _xyzAmount = _xyzAmount.mul(1000000000000000000);
         msg.sender.transfer(_xyzAmount.div(conversionRate));
-        
         emit Swap(msg.sender, "XYZ", _xyzAmount, "ETH", _xyzAmount.div(conversionRate));
         emit TokensBurned(_xyzAmount);
         emit Withdrawal(msg.sender, (_xyzAmount.div(conversionRate)));
-        
         return true;
     }
 }
