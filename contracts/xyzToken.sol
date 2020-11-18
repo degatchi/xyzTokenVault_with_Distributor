@@ -19,7 +19,9 @@ contract xyzToken is Permissions {
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) internal vaultBalance;
     // Mapping owner address to those who are allowed to use the contract 
-    mapping(address => mapping (address => uint256)) allowed; 
+    mapping(address => mapping (address => uint256)) allowed;
+    mapping(address => mapping (address => uint256)) allowedBalance;
+    mapping(address => mapping (address => bool)) hasAccess;
 
     // Broadcasted Events
     event returnTokens(address indexed _address, uint _amount);
@@ -47,31 +49,35 @@ contract xyzToken is Permissions {
 
     // function approve 
     function approve(address _spender, uint256 _amount) public returns (bool success) {
-        require(balanceOf[msg.sender] >= 0, "No funds available to use");
-        // If the adress is allowed to spend from this contract 
-        allowed[msg.sender][_spender] = _amount; 
+        require(balanceOf[msg.sender] != 0, "No funds available to use");
+        require(balanceOf[msg.sender] > 0, "No funds available to use");
+        allowedBalance[_spender][msg.sender] = allowedBalance[_spender][msg.sender].add(_amount);
+        hasAccess[_spender][msg.sender] = true;
+        // If the adress is allowed to spend from this contract
+        allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_amount); 
         emit Approval(msg.sender, _spender, _amount); 
         return true; 
     } 
     
 // ---------------------------------------[Transfer]-----------------------------------------------
     
-    // allows transfer funds from msg.sender address to input address
     function transfer(address _to, uint256 _amount) public returns (bool success) {
-        require(balanceOf[msg.sender] != 0, "Not enough funds");
-        balanceOf[msg.sender] -= _amount;
-        balanceOf[_to] += _amount;
+        require(_amount <= balanceOf[msg.sender], "insufficient funds");
+        balanceOf[msg.sender] = balanceOf[msg.sender].sub(_amount);
+        balanceOf[_to] = balanceOf[_to].add(_amount);
         emit Transfer(msg.sender, _to, _amount);  
         return true;
     }
     
     // allows contracts to send tokens on your behalf, 
     // for example to "deposit" to a contract address and/or to charge fees in sub-currencies
-    function transferFrom(address _from, address _to, uint256 _amount) public returns (bool success) { 
-        require(allowed[_from][msg.sender] >= _amount, "Not allowed from owner"); 
-        allowed[_from][msg.sender] -= _amount;
-        balanceOf[_from] -= _amount; 
-        balanceOf[_to] += _amount; 
+    function transferFrom(address _from, address _to, uint256 _amount) public returns (bool success) {
+        require(_amount <= allowedBalance[_from][msg.sender], "insufficient amount allowed to transfer from allower");
+        
+        allowed[msg.sender][_from] = allowed[msg.sender][_from].sub(_amount);
+        balanceOf[msg.sender] = balanceOf[msg.sender].sub(_amount);
+        balanceOf[_to] = balanceOf[_to].add(_amount);
+        
         emit deductionOfFundsAllowed(_from, _amount);
         emit Transfer(_from, _to, _amount);  
         return true; 
