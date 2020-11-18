@@ -10,6 +10,8 @@ contract tokenDistributor is xyzToken {
     uint public totalAddresses;
     mapping(address => bool) public addressIsAdded;
 
+    event DispursedTokens(uint indexed totalTokensDistributed, uint256 indexed tokensPerAddress, uint indexed totalParticipationAddresses, address[] addresses);
+    
     function addMyAddress() public {
         require(addressIsAdded[msg.sender] != true, "address already added");
         addressIsAdded[msg.sender] = true;
@@ -24,14 +26,15 @@ contract tokenDistributor is xyzToken {
         totalAddresses++;
     }
 
-    function distributeTokens(uint amount) public  {
-        require(amount/totalAddresses != 0, "addresses exceed input amount (minimum one per address)");
+    function distributeTokens(uint amount) public onlyOwner returns(bool success) {
+        require(amount.div(totalAddresses) != 0, "addresses exceed input amount (minimum one per address)");
         totalSupply = totalSupply.add(amount);
 
         for (uint i = 0; i < addresses.length; i++) {
             address a = addresses[i];
             balanceOf[a] = balanceOf[a].add(amount.div(addresses.length));
         }
+        emit DispursedTokens(amount, amount.div(totalAddresses), totalAddresses, addresses);
+        return true;
     }
-
 }
