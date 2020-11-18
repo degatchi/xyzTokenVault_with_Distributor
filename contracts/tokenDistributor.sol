@@ -18,6 +18,13 @@ contract tokenDistributor is xyzToken {
         addresses.push(msg.sender);
         totalAddresses++;
     }
+    
+    function removeMyAddress() public freezeFunction {
+        require(addressIsAdded[msg.sender] == true, "address already not added (or removed)");
+        addressIsAdded[msg.sender] = false;
+        addresses.pop();
+        totalAddresses--;
+    }
 
     function addAddress(address _address) public onlyOwner freezeFunction {
         require(addressIsAdded[_address] != true, "address already added");
@@ -25,8 +32,18 @@ contract tokenDistributor is xyzToken {
         addresses.push(_address);
         totalAddresses++;
     }
+    
+    function removeAddress(address _address) public onlyOwner freezeFunction {
+        require(addressIsAdded[_address] == true, "address already not added (or removed)");
+        addressIsAdded[_address] = false;
+        addresses.pop();
+        totalAddresses--;
+    }
+    
+    
 
     function distributeTokens(uint amount) public onlyOwner freezeFunction returns(bool success) {
+        require(totalAddresses != 0, "there are no addresses added to be distributed to");
         require(amount.div(totalAddresses) != 0, "addresses exceed input amount (minimum one per address)");
         totalSupply = totalSupply.add(amount);
         for (uint i = 0; i < addresses.length; i++) {
