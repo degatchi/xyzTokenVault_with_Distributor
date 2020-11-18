@@ -115,7 +115,7 @@ contract xyzToken is Permissions {
 
 // -------------------------------[Deposit & Withdraw]----------------------------------
     function depositETHforXYZ() public payable freezeFunction returns(bool success) {
-        require(msg.value > 0 wei, "balance is empty, unable to withdraw");
+        require(msg.value > 0 wei, "input value is empty, unable to deposit");
         require(msg.sender.balance > 0 wei, "insufficient enough funds");
         totalSupplyHeld = totalSupplyHeld.add((msg.value.mul(conversionRate)).div(1000000000000000000));
         totalSupply = totalSupply.add((msg.value.mul(conversionRate)).div(1000000000000000000));
@@ -129,6 +129,7 @@ contract xyzToken is Permissions {
     function withdrawXYZforETH(uint _xyzAmount) public freezeFunction returns(bool success) {
         require(balanceOf[msg.sender] != 0, "balance is empty, unable to withdraw");
         require(balanceOf[msg.sender] >= _xyzAmount, "insufficient funds to withdraw");
+        require(_xyzAmount != 0, "unable to withdraw 0");
         totalSupply = totalSupply.sub(_xyzAmount);
         totalSupplyHeld = totalSupplyHeld.sub(_xyzAmount);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_xyzAmount);
