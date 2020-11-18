@@ -18,7 +18,6 @@ contract xyzToken is Permissions {
     
     // balanceOf displays balanceOf XYZ Token for an address
     mapping(address => uint256) public balanceOf;
-    mapping(address => uint256) internal vaultBalance;
     // Mapping owner address to those who are allowed to use the contract 
     mapping(address => mapping (address => uint256)) allowed;
     mapping(address => mapping (address => bool)) hasAccess;
