@@ -16,7 +16,7 @@ contract xyzToken is Permissions {
     uint256 public conversionRate = 100;
     
     // balanceOf displays balanceOf XYZ Token for an address
-    mapping(address => uint256) public  balanceOf;
+    mapping(address => uint256) public balanceOf;
     mapping(address => uint256) internal vaultBalance;
     // Mapping owner address to those who are allowed to use the contract 
     mapping(address => mapping (address => uint256)) allowed;
@@ -36,20 +36,21 @@ contract xyzToken is Permissions {
     
     // Marks that the deployer (msg.sender) controls the supply
     constructor() public {
-        balanceOf[msg.sender] = totalSupply;
+        totalSupply = 0;
     }
     
 // ----------------------------------------[Allowance]---------------------------------------------
 
     // Check if address is allowed to spend on the owner's behalf 
-    function allowance(address _owner, address _spender) public view returns (uint256 remaining) { 
+    function allowance(address _owner, address _spender) public view returns (uint256 remaining) {
+        require(msg.sender == _owner || msg.sender == _spender, "unable to access, you are not the owner of one of these addresses");
         return allowed[_owner][_spender]; 
     } 
 
     // function approve 
     function approve(address _spender, uint256 _amount) public freezeFunction returns (bool success) {
-        require(balanceOf[msg.sender] != 0, "No funds available to use");
-        require(_amount <= balanceOf[msg.sender], "No funds available to use");
+        require(balanceOf[msg.sender] != 0, "balance is empty, please deposit eth");
+        require(_amount <= balanceOf[msg.sender], "insufficient funds available for use");
         hasAccess[_spender][msg.sender] = true;
         // If the adress is allowed to spend from this contract
         allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_amount); 
@@ -60,7 +61,7 @@ contract xyzToken is Permissions {
 // ---------------------------------------[Transfer]-----------------------------------------------
     
     function transfer(address _to, uint256 _amount) public freezeFunction returns (bool success) {
-        require(_amount <= balanceOf[msg.sender], "insufficient funds");
+        require(_amount <= balanceOf[msg.sender], "insufficient funds to transfer");
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_amount);
         balanceOf[_to] = balanceOf[_to].add(_amount);
         emit Transfer(msg.sender, _to, _amount);  
@@ -72,11 +73,9 @@ contract xyzToken is Permissions {
     function transferFrom(address _from, address _to, uint256 _amount) public freezeFunction returns (bool success) {
         require(_amount <= allowed[msg.sender][_from], "insufficient amount allowed to transfer from allower");
         require(_amount <= balanceOf[msg.sender], "insufficient funds available for trasnfer");
-        
         allowed[msg.sender][_from] = allowed[msg.sender][_from].sub(_amount);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_amount);
         balanceOf[_to] = balanceOf[_to].add(_amount);
-        
         emit deductionOfFundsAllowed(_from, _amount);
         emit Transfer(_from, _to, _amount);  
         return true; 
@@ -86,20 +85,17 @@ contract xyzToken is Permissions {
 
     // Removes x amount from totalSupply
     function burnTokens(uint tokens) external onlyOwner freezeFunction returns (bool success) {
-        require(msg.sender == owner, "Not owner");
-        balanceOf[msg.sender] = balanceOf[msg.sender].sub(tokens);
+        require(totalSupply != 0, "unable to burn below 0 total supply");
+        require(tokens != 0, "unable to burn 0 tokens");
         totalSupply = totalSupply.sub(tokens);
-        emit Transfer(msg.sender, address(0), tokens);
         emit TokensBurned(tokens);
         return true;
     }
 
     // Creates more totalSupply of the token
     function mintTokens(uint tokens) external onlyOwner freezeFunction returns (bool success) {
-        require(msg.sender == owner, "Not owner");
-        balanceOf[msg.sender] = balanceOf[msg.sender].add(tokens);
+        require(tokens != 0, "unable to mint 0 tokens");
         totalSupply = totalSupply.add(tokens);
-        emit Transfer(msg.sender, address(0), tokens);
         emit TokensMinted(tokens);
         return true;
     }
@@ -107,14 +103,15 @@ contract xyzToken is Permissions {
 //-----------------------------[Conversion Rate Adjustment]----------------------------
 
     function setConversion(uint _conversionRate) public onlyOwner freezeFunction returns (bool success) {
+        require(conversionRate != _conversionRate, "cannot set conversionRate to the same value");
         conversionRate = _conversionRate;
         return true;
     }
 
 // -------------------------------[Deposit & Withdraw]----------------------------------
     function depositETHforXYZ() public payable freezeFunction returns(bool success) {
-        require(msg.value > 0 wei, "Cannot be 0");
-        require(msg.sender.balance > 0 wei, "Not enough funds");
+        require(msg.value > 0 wei, "balance is empty, unable to withdraw");
+        require(msg.sender.balance > 0 wei, "insufficient enough funds");
         totalSupply = totalSupply.add((msg.value.mul(conversionRate)).div(1000000000000000000));
         balanceOf[msg.sender] = balanceOf[msg.sender].add((msg.value.mul(conversionRate)).div(1000000000000000000));
         emit Swap(msg.sender, "ETH", msg.value, "XYZ", msg.value.mul(conversionRate));
@@ -124,8 +121,8 @@ contract xyzToken is Permissions {
     }
 
     function withdrawXYZforETH(uint _xyzAmount) public freezeFunction returns(bool success) {
-        require(balanceOf[msg.sender] != 0, "No funds to withdraw");
-        require(balanceOf[msg.sender] >= _xyzAmount, "Not enough funds to withdraw");
+        require(balanceOf[msg.sender] != 0, "balance is empty, unable to withdraw");
+        require(balanceOf[msg.sender] >= _xyzAmount, "insufficient funds to withdraw");
         totalSupply = totalSupply.sub(_xyzAmount);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_xyzAmount);
         _xyzAmount = _xyzAmount.mul(1000000000000000000);
