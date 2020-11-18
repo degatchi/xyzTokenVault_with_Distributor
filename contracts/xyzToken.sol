@@ -23,7 +23,6 @@ contract xyzToken is Permissions {
     mapping(address => mapping (address => bool)) hasAccess;
 
     // Broadcasted Events
-    event returnTokens(address indexed _address, uint _amount);
     event TokensMinted(uint indexed _mintedTokens);
     event TokensBurned(uint indexed _burnedSupply);
     event Deposit(address indexed dst, uint val);
@@ -31,7 +30,6 @@ contract xyzToken is Permissions {
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
     event deductionOfFundsAllowed(address indexed _address, uint removed);
-    event allowanceChange(address indexed _owner, address indexed _spender, uint256 _value);
     event Swap(address indexed _user, string inputCurrency, uint input, string outputCurrency, uint output);
     
     // Marks that the deployer (msg.sender) controls the supply
@@ -43,12 +41,13 @@ contract xyzToken is Permissions {
 
     // Check if address is allowed to spend on the owner's behalf 
     function allowance(address _owner, address _spender) public view returns (uint256 remaining) {
-        require(msg.sender == _owner || msg.sender == _spender, "unable to access, you are not the owner of one of these addresses");
+        require(msg.sender == _owner || msg.sender == _spender, "unable to access unless you're address is one of the input addresses");
         return allowed[_owner][_spender]; 
     } 
 
     // function approve 
     function approve(address _spender, uint256 _amount) public freezeFunction returns (bool success) {
+        require(msg.sender != _spender, "unable to approve tokens to yourself");
         require(balanceOf[msg.sender] != 0, "balance is empty, please deposit eth");
         require(_amount <= balanceOf[msg.sender], "insufficient funds available for use");
         hasAccess[_spender][msg.sender] = true;
@@ -61,6 +60,7 @@ contract xyzToken is Permissions {
 // ---------------------------------------[Transfer]-----------------------------------------------
     
     function transfer(address _to, uint256 _amount) public freezeFunction returns (bool success) {
+        require(msg.sender != _to, "unable to transfer to yourself");
         require(_amount <= balanceOf[msg.sender], "insufficient funds to transfer");
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_amount);
         balanceOf[_to] = balanceOf[_to].add(_amount);
@@ -71,6 +71,7 @@ contract xyzToken is Permissions {
     // allows contracts to send tokens on your behalf, 
     // for example to "deposit" to a contract address and/or to charge fees in sub-currencies
     function transferFrom(address _from, address _to, uint256 _amount) public freezeFunction returns (bool success) {
+        require(_from != _to, "unable to send to yourself");
         require(_amount <= allowed[msg.sender][_from], "insufficient amount allowed to transfer from allower");
         require(_amount <= balanceOf[msg.sender], "insufficient funds available for trasnfer");
         allowed[msg.sender][_from] = allowed[msg.sender][_from].sub(_amount);
