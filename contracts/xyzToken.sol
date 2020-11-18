@@ -51,7 +51,7 @@ contract xyzToken is Permissions {
         require(msg.sender != _spender, "unable to approve tokens to yourself");
         require(balanceOf[msg.sender] != 0, "balance is empty, please deposit eth");
         require(_amount <= balanceOf[msg.sender], "insufficient funds available for use");
-        hasAccess[_spender][msg.sender] = true;
+        hasAccess[msg.sender][_spender] = true;
         // If the adress is allowed to spend from this contract
         allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_amount); 
         emit Approval(msg.sender, _spender, _amount); 
