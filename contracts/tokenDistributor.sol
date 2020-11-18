@@ -1,6 +1,6 @@
 pragma solidity 0.6.6;
 
-import "./XYZToken.sol";
+import "./xyzToken.sol";
 import "./SafeMath.sol";
 
 contract tokenDistributor is xyzToken {
