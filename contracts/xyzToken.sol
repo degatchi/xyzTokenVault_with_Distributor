@@ -14,6 +14,7 @@ contract xyzToken is Permissions {
     uint256 public totalSupply; // dynamic supply
     uint8 decimals = 18;
     uint256 public conversionRate = 100;
+    uint256 public totalSupplyHeld;
     
     // balanceOf displays balanceOf XYZ Token for an address
     mapping(address => uint256) public balanceOf;
@@ -85,20 +86,22 @@ contract xyzToken is Permissions {
 // -------------------------------------[Mint + Burn]--------------------------------------
 
     // Removes x amount from totalSupply
-    function burnTokens(uint tokens) external onlyOwner freezeFunction returns (bool success) {
+    function burnTokens(uint tokens) external onlyOwner freezeFunction returns (uint256) {
         require(totalSupply != 0, "unable to burn below 0 total supply");
+        require(totalSupply != totalSupplyHeld, "unable to burn token holders' funds");
+        require(totalSupply.sub(tokens) >= totalSupplyHeld, "unable to burn held tokens");
         require(tokens != 0, "unable to burn 0 tokens");
         totalSupply = totalSupply.sub(tokens);
         emit TokensBurned(tokens);
-        return true;
+        return totalSupply;
     }
 
     // Creates more totalSupply of the token
-    function mintTokens(uint tokens) external onlyOwner freezeFunction returns (bool success) {
+    function mintTokens(uint tokens) external onlyOwner freezeFunction returns (uint256) {
         require(tokens != 0, "unable to mint 0 tokens");
         totalSupply = totalSupply.add(tokens);
         emit TokensMinted(tokens);
-        return true;
+        return totalSupply;
     }
     
 //-----------------------------[Conversion Rate Adjustment]----------------------------
@@ -113,6 +116,7 @@ contract xyzToken is Permissions {
     function depositETHforXYZ() public payable freezeFunction returns(bool success) {
         require(msg.value > 0 wei, "balance is empty, unable to withdraw");
         require(msg.sender.balance > 0 wei, "insufficient enough funds");
+        totalSupplyHeld = totalSupplyHeld.add((msg.value.mul(conversionRate)).div(1000000000000000000));
         totalSupply = totalSupply.add((msg.value.mul(conversionRate)).div(1000000000000000000));
         balanceOf[msg.sender] = balanceOf[msg.sender].add((msg.value.mul(conversionRate)).div(1000000000000000000));
         emit Swap(msg.sender, "ETH", msg.value, "XYZ", msg.value.mul(conversionRate));
@@ -125,6 +129,7 @@ contract xyzToken is Permissions {
         require(balanceOf[msg.sender] != 0, "balance is empty, unable to withdraw");
         require(balanceOf[msg.sender] >= _xyzAmount, "insufficient funds to withdraw");
         totalSupply = totalSupply.sub(_xyzAmount);
+        totalSupplyHeld = totalSupplyHeld.sub(_xyzAmount);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_xyzAmount);
         _xyzAmount = _xyzAmount.mul(1000000000000000000);
         msg.sender.transfer(_xyzAmount.div(conversionRate));
