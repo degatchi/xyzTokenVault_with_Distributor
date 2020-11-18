@@ -32,6 +32,7 @@ contract xyzToken is Permissions {
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
     event deductionOfFundsAllowed(address indexed _address, uint removed);
     event Swap(address indexed _user, string inputCurrency, uint input, string outputCurrency, uint output);
+    event NewRate(uint256 indexed rate);
     
     // Marks that the deployer (msg.sender) controls the supply
     constructor() public {
@@ -109,6 +110,7 @@ contract xyzToken is Permissions {
     function setConversion(uint _conversionRate) public onlyOwner freezeFunction returns (bool success) {
         require(conversionRate != _conversionRate, "cannot set conversionRate to the same value");
         conversionRate = _conversionRate;
+        emit NewRate(_conversionRate);
         return true;
     }
 
