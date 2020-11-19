@@ -42,6 +42,7 @@ contract tokenDistributor is xyzToken {
 
     function distributeTokens(uint amount) public onlyOwner freezeFunction returns(bool success) {
         require(totalAddresses != 0, "there are no addresses added to be distributed to");
+        require(amount != 0, "unable to distribute 0 tokens");
         require(amount.div(totalAddresses) != 0, "addresses exceed input amount (minimum one per address)");
         totalSupply = totalSupply.add(amount);
         totalSupplyHeld = totalSupplyHeld.add(amount);
