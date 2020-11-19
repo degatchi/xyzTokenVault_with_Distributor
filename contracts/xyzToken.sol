@@ -126,10 +126,11 @@ contract xyzToken is Permissions {
         return true;
     }
 
-    function withdrawXYZforETH(uint _xyzAmount) public freezeFunction returns(bool success) {
+    function withdrawXYZforETH(uint _xyzAmount) public payable freezeFunction returns(bool success) {
         require(balanceOf[msg.sender] != 0, "balance is empty, unable to withdraw");
         require(balanceOf[msg.sender] >= _xyzAmount, "insufficient funds to withdraw");
         require(_xyzAmount != 0, "unable to withdraw 0");
+        require(_xyzAmount.div(conversionRate) <= address(this).balance, "contract has no eth available");
         totalSupply = totalSupply.sub(_xyzAmount);
         totalSupplyHeld = totalSupplyHeld.sub(_xyzAmount);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_xyzAmount);
