@@ -106,7 +106,7 @@ contract xyzToken is Permissions {
     
 //-----------------------------[Conversion Rate Adjustment]----------------------------
 
-    function setConversion(uint _conversionRate) public onlyOwner freezeFunction returns (bool success) {
+    function setETHConversion(uint _conversionRate) public onlyOwner freezeFunction returns (bool success) {
         require(conversionRate != _conversionRate, "cannot set conversionRate to the same value");
         conversionRate = _conversionRate;
         emit NewRate(_conversionRate);
